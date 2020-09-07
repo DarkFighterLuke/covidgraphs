@@ -1,4 +1,4 @@
-package datagraphs
+package covidgraphs
 
 import (
 	"fmt"
@@ -14,6 +14,7 @@ const (
 	nightSwitch = "19:00:00"
 )
 
+// Calculates annotations containing the difference to the previous point on the plot
 func deltaAnnotations(deltas *[]string, xValues *[]time.Time, yValues *[]float64) chart.AnnotationSeries {
 	value2 := make([]chart.Value2, 0)
 	for i := 0; i < len(*deltas)-1; i++ {
@@ -27,7 +28,8 @@ func deltaAnnotations(deltas *[]string, xValues *[]time.Time, yValues *[]float64
 	return chart.AnnotationSeries{Annotations: value2}
 }
 
-func timeseriesChart(charts *[]chart.TimeSeries, gridLines *[]chart.GridLine, annotations *[]chart.AnnotationSeries, title, xAxisName, yAxisName string) (error, string) {
+// Creates a plot with the given series
+func timeseriesChart(charts *[]chart.TimeSeries, gridLines *[]chart.GridLine, annotations *[]chart.AnnotationSeries, title, filename, xAxisName, yAxisName string) (error, string) {
 	series := make([]chart.Series, 0)
 	for _, v := range *charts {
 		series = append(series, v)
@@ -35,7 +37,7 @@ func timeseriesChart(charts *[]chart.TimeSeries, gridLines *[]chart.GridLine, an
 	for _, v := range *annotations {
 		series = append(series, v)
 	}
-
+	
 	var backgroundColor drawing.Color
 	var fontsColor drawing.Color
 	var colorMode string
@@ -105,7 +107,9 @@ func timeseriesChart(charts *[]chart.TimeSeries, gridLines *[]chart.GridLine, an
 		FontSize: 15,
 	})}
 
-	filename := title + "-" + time.Now().Format("20060102T15") + "-" + colorMode + ".png"
+	if filename==""{
+		filename=title+"-"+colorMode+".png"
+	}
 	f, err := os.Create(filename)
 	if err != nil {
 		return fmt.Errorf("error while creating file: %v", err), ""
@@ -118,6 +122,7 @@ func timeseriesChart(charts *[]chart.TimeSeries, gridLines *[]chart.GridLine, an
 	return nil, filename
 }
 
+// Converts dates to Float64 to fit the X Axis of the plots
 func dateXAxis(date *[]chart.GridLine, newDate time.Time) *[]chart.GridLine {
 	*date = append(*date, chart.GridLine{
 		Value: chart.TimeToFloat64(newDate),
@@ -126,7 +131,8 @@ func dateXAxis(date *[]chart.GridLine, newDate time.Time) *[]chart.GridLine {
 	return date
 }
 
-func nationToTimeseries(data *[]nationData, fieldName string, index int) (*[]time.Time, *[]float64, *[]chart.GridLine, error) {
+// Creates series of points according to the national data
+func nationToTimeseries(data *[]NationData, fieldName string, index int) (*[]time.Time, *[]float64, *[]chart.GridLine, error) {
 	date := make([]time.Time, 0)
 	values := make([]float64, 0)
 	dateAxis := make([]chart.GridLine, 0)
@@ -140,36 +146,35 @@ func nationToTimeseries(data *[]nationData, fieldName string, index int) (*[]tim
 		date = append(date, dateRead)
 		dateAxis = *dateXAxis(&dateAxis, dateRead)
 
-		switch fieldName {
-		case "Ricoverati_con_sintomi":
+		switch strings.ToLower(fieldName) {
+		case "ricoverati_con_sintomi":
 			values = append(values, float64((*data)[i].Ricoverati_con_sintomi))
 			break
-		case "Terapia_intensiva":
+		case "terapia_intensiva":
 			values = append(values, float64((*data)[i].Terapia_intensiva))
 			break
-		case "Totale_ospedalizzati":
+		case "totale_ospedalizzati":
 			values = append(values, float64((*data)[i].Totale_ospedalizzati))
 			break
-		case "Isolamento_domiciliare":
+		case "isolamento_domiciliare":
 			values = append(values, float64((*data)[i].Isolamento_domiciliare))
 			break
-		case "Totale_attualmente_positivi":
-			values = append(values, float64((*data)[i].Totale_attualmente_positivi))
+		case "attualmente_positivi":
+			values = append(values, float64((*data)[i].Totale_positivi))
 			break
-		case "Nuovi_positivi":
-			//fmt.Println((*data)[i].Nuovi_positivi)
+		case "nuovi_positivi":
 			values = append(values, float64((*data)[i].Nuovi_positivi))
 			break
-		case "Dimessi_guariti":
+		case "dimessi_guariti":
 			values = append(values, float64((*data)[i].Dimessi_guariti))
 			break
-		case "Deceduti":
+		case "deceduti":
 			values = append(values, float64((*data)[i].Deceduti))
 			break
-		case "Totale_casi":
+		case "totale_casi":
 			values = append(values, float64((*data)[i].Totale_casi))
 			break
-		case "Tamponi":
+		case "tamponi":
 			values = append(values, float64((*data)[i].Tamponi))
 			break
 		default:
@@ -180,7 +185,8 @@ func nationToTimeseries(data *[]nationData, fieldName string, index int) (*[]tim
 	return &date, &values, &dateAxis, nil
 }
 
-func regionToTimeseries(data *[]regionData, fieldName string, index int, startRegionCodeIndex int) (*[]time.Time, *[]float64, *[]chart.GridLine, error) {
+// Creates series of points according to the regional data
+func regionToTimeseries(data *[]RegionData, fieldName string, index int, startRegionCodeIndex int) (*[]time.Time, *[]float64, *[]chart.GridLine, error) {
 	if startRegionCodeIndex < 0 || startRegionCodeIndex > 21 {
 		return nil, nil, nil, fmt.Errorf("region index out of range")
 	}
@@ -189,10 +195,10 @@ func regionToTimeseries(data *[]regionData, fieldName string, index int, startRe
 	values := make([]float64, 0)
 	dateAxis := make([]chart.GridLine, 0)
 
-	offset := index % startRegionCodeIndex
+	offset := index % 21
 	var realIndex int
-	if offset == 0 {
-		realIndex = offset
+	if offset == startRegionCodeIndex {
+		realIndex = index
 	} else if offset > startRegionCodeIndex {
 		realIndex = index + 21 - (offset - startRegionCodeIndex)
 	} else {
@@ -209,35 +215,35 @@ func regionToTimeseries(data *[]regionData, fieldName string, index int, startRe
 		date = append(date, dateRead)
 		dateAxis = *dateXAxis(&dateAxis, dateRead)
 
-		switch fieldName {
-		case "Ricoverati_con_sintomi":
+		switch strings.ToLower(fieldName) {
+		case "ricoverati_con_sintomi":
 			values = append(values, float64((*data)[i].Ricoverati_con_sintomi))
 			break
-		case "Terapia_intensiva":
+		case "terapia_intensiva":
 			values = append(values, float64((*data)[i].Terapia_intensiva))
 			break
-		case "Totale_ospedalizzati":
+		case "totale_ospedalizzati":
 			values = append(values, float64((*data)[i].Totale_ospedalizzati))
 			break
-		case "Isolamento_domiciliare":
+		case "isolamento_domiciliare":
 			values = append(values, float64((*data)[i].Isolamento_domiciliare))
 			break
-		case "Totale_attualmente_positivi":
-			values = append(values, float64((*data)[i].Totale_attualmente_positivi))
+		case "attualmente_positivi":
+			values = append(values, float64((*data)[i].Totale_positivi))
 			break
-		case "Nuovi_positivi":
+		case "nuovi_positivi":
 			values = append(values, float64((*data)[i].Nuovi_positivi))
 			break
-		case "Dimessi_guariti":
+		case "dimessi_guariti":
 			values = append(values, float64((*data)[i].Dimessi_guariti))
 			break
-		case "Deceduti":
+		case "deceduti":
 			values = append(values, float64((*data)[i].Deceduti))
 			break
-		case "Totale_casi":
+		case "totale_casi":
 			values = append(values, float64((*data)[i].Totale_casi))
 			break
-		case "Tamponi":
+		case "tamponi":
 			values = append(values, float64((*data)[i].Tamponi))
 			break
 		default:
@@ -248,11 +254,22 @@ func regionToTimeseries(data *[]regionData, fieldName string, index int, startRe
 	return &date, &values, &dateAxis, nil
 }
 
-func provinceToTimeseries(data *[]provinceData, fieldName string, index int, startProvinceCodeIndex int) (*[]time.Time, *[]float64, *[]chart.GridLine, error) {
+// Creates series of points according to the provincial data
+func provinceToTimeseries(data *[]ProvinceData, fieldName string, index int, startProvinceCodeIndex int) (*[]time.Time, *[]float64, *[]chart.GridLine, error) {
+	offset := index % ProvinceOffset
+	var realIndex int
+	if offset == startProvinceCodeIndex {
+		realIndex = index
+	} else if offset > startProvinceCodeIndex {
+		realIndex = index + ProvinceOffset - (offset - startProvinceCodeIndex)
+	} else {
+		realIndex = index + (startProvinceCodeIndex - offset)
+	}
+
 	date := make([]time.Time, 0)
 	values := make([]float64, 0)
 	dateAxis := make([]chart.GridLine, 0)
-	for i := startProvinceCodeIndex; i < len(*data); i += provinceOffset {
+	for i := realIndex; i < len(*data); i += ProvinceOffset {
 		dateRead, err := time.Parse("2006-01-02T15:04:05", (*data)[i].Data)
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("error converting date string to date: %v", err)
@@ -266,7 +283,7 @@ func provinceToTimeseries(data *[]provinceData, fieldName string, index int, sta
 		case "totale_casi":
 			values = append(values, float64((*data)[i].Totale_casi))
 			break
-		case "nuovicasi":
+		case "nuovi_positivi":
 			values = append(values, float64((*data)[i].NuoviCasi))
 			break
 		default:

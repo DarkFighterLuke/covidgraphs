@@ -1,14 +1,16 @@
-package datagraphs
+package covidgraphs
 
 import (
 	"fmt"
 	"github.com/wcharczuk/go-chart"
 	"github.com/wcharczuk/go-chart/drawing"
+	"os"
+	"strings"
 	"time"
 )
 
-func andamentoNazionaleCompleto(data *[]nationData) (error, string) {
-	title := "Andamento nazionale"
+// Returns a plot including total cases, healed and dead
+func AndamentoNazionaleCompleto(data *[]NationData, title, filename string) (error, string) {
 	xAxisName := ""
 	yAxisName := ""
 
@@ -76,15 +78,198 @@ func andamentoNazionaleCompleto(data *[]nationData) (error, string) {
 
 	annotations := make([]chart.AnnotationSeries, 0)
 
-	err, filename := timeseriesChart(&series, xNames, &annotations, title, xAxisName, yAxisName)
+	err, fileName := timeseriesChart(&series, xNames, &annotations, title, filename, xAxisName, yAxisName)
 	if err != nil {
 		return fmt.Errorf("%v", err), ""
 	}
-	return nil, filename
+	return nil, fileName
 }
 
-func totalePositiviNazione(data *[]nationData, placeAnnotations bool) (error, string) {
-	title := "Totale Contagi"
+// Returns a plot with the national data according to the specified fields
+func VociNazione(data *[]NationData, fieldName []string, nationIndex int, title, filename string) (error, string) {
+	xAxisName := ""
+	yAxisName := ""
+
+	var err error
+	var xValues *[]time.Time
+	var yValues *[]float64
+	var xNames *[]chart.GridLine
+	series := make([]chart.TimeSeries, 0)
+	var color drawing.Color
+	var alpha uint8 = 200
+	var fileName string
+	for _, v := range fieldName {
+		switch strings.ToLower(v) {
+		case "ricoverati_con_sintomi":
+			xValues, yValues, xNames, err = nationToTimeseries(data, v, nationIndex)
+			color = drawing.Color{38, 224, 175, 255}
+
+			series = append(series, chart.TimeSeries{
+				Name: v,
+				Style: chart.Style{
+					StrokeColor: color,
+					FillColor:   color.WithAlpha(alpha),
+				},
+				YAxis:   0,
+				XValues: *xValues,
+				YValues: *yValues,
+			})
+			break
+		case "terapia_intensiva":
+			xValues, yValues, xNames, err = nationToTimeseries(data, v, nationIndex)
+			color = drawing.Color{88, 22, 115, 255}
+
+			series = append(series, chart.TimeSeries{
+				Name: v,
+				Style: chart.Style{
+					StrokeColor: color,
+					FillColor:   color.WithAlpha(alpha),
+				},
+				YAxis:   0,
+				XValues: *xValues,
+				YValues: *yValues,
+			})
+			break
+		case "totale_ospedalizzati":
+			xValues, yValues, xNames, err = nationToTimeseries(data, v, nationIndex)
+			color = drawing.Color{171, 213, 255, 255}
+
+			series = append(series, chart.TimeSeries{
+				Name: v,
+				Style: chart.Style{
+					StrokeColor: color,
+					FillColor:   color.WithAlpha(alpha),
+				},
+				YAxis:   0,
+				XValues: *xValues,
+				YValues: *yValues,
+			})
+			break
+		case "isolamento_domiciliare":
+			xValues, yValues, xNames, err = nationToTimeseries(data, v, nationIndex)
+			color = drawing.Color{171, 213, 255, 255}
+
+			series = append(series, chart.TimeSeries{
+				Name: v,
+				Style: chart.Style{
+					StrokeColor: color,
+					FillColor:   color.WithAlpha(alpha),
+				},
+				YAxis:   0,
+				XValues: *xValues,
+				YValues: *yValues,
+			})
+			break
+		case "attualmente_positivi":
+			xValues, yValues, xNames, err = nationToTimeseries(data, v, nationIndex)
+			color = drawing.Color{237, 164, 17, 255}
+
+			series = append(series, chart.TimeSeries{
+				Name: v,
+				Style: chart.Style{
+					StrokeColor: color,
+					FillColor:   color.WithAlpha(alpha),
+				},
+				YAxis:   0,
+				XValues: *xValues,
+				YValues: *yValues,
+			})
+			break
+		case "nuovi_positivi":
+			xValues, yValues, xNames, err = nationToTimeseries(data, v, nationIndex)
+			color = drawing.Color{18, 4, 217, 255}
+
+			series = append(series, chart.TimeSeries{
+				Name: v,
+				Style: chart.Style{
+					StrokeColor: color,
+					FillColor:   color.WithAlpha(alpha),
+				},
+				YAxis:   0,
+				XValues: *xValues,
+				YValues: *yValues,
+			})
+			break
+		case "dimessi_guariti":
+			xValues, yValues, xNames, err = nationToTimeseries(data, v, nationIndex)
+			color = drawing.Color{38, 224, 175, 255}
+
+			series = append(series, chart.TimeSeries{
+				Name: v,
+				Style: chart.Style{
+					StrokeColor: color,
+					FillColor:   color.WithAlpha(alpha),
+				},
+				YAxis:   0,
+				XValues: *xValues,
+				YValues: *yValues,
+			})
+			break
+		case "deceduti":
+			xValues, yValues, xNames, err = nationToTimeseries(data, v, nationIndex)
+			color = chart.ColorAlternateGray
+
+			series = append(series, chart.TimeSeries{
+				Name: v,
+				Style: chart.Style{
+					StrokeColor: color,
+					FillColor:   color.WithAlpha(alpha),
+				},
+				YAxis:   0,
+				XValues: *xValues,
+				YValues: *yValues,
+			})
+			break
+		case "totale_casi":
+			xValues, yValues, xNames, err = nationToTimeseries(data, v, nationIndex)
+			if err != nil {
+				fmt.Println(err)
+			}
+			color = drawing.Color{R: 255, A: 255}
+
+			series = append(series, chart.TimeSeries{
+				Name: v,
+				Style: chart.Style{
+					StrokeColor: color,
+					FillColor:   color.WithAlpha(alpha),
+				},
+				YAxis:   0,
+				XValues: *xValues,
+				YValues: *yValues,
+			})
+			break
+		case "tamponi":
+			xValues, yValues, xNames, err = nationToTimeseries(data, v, nationIndex)
+			color = drawing.Color{175, 232, 169, 255}
+
+			series = append(series, chart.TimeSeries{
+				Name: v,
+				Style: chart.Style{
+					StrokeColor: color,
+					FillColor:   color.WithAlpha(alpha),
+				},
+				YAxis:   0,
+				XValues: *xValues,
+				YValues: *yValues,
+			})
+			break
+		default:
+			return fmt.Errorf("wrong field name passed"), ""
+		}
+
+		annotations := make([]chart.AnnotationSeries, 0)
+
+		err, fileName = timeseriesChart(&series, xNames, &annotations, title, filename, xAxisName, yAxisName)
+		if err != nil {
+			return fmt.Errorf("%v", err), ""
+		}
+	}
+
+	return nil, fileName
+}
+
+// Returns a plot including national total cases
+func TotalePositiviNazione(data *[]NationData, placeAnnotations bool, title, filename string) (error, string) {
 	xAxisName := ""
 	yAxisName := "Contagiati"
 
@@ -123,15 +308,15 @@ func totalePositiviNazione(data *[]nationData, placeAnnotations bool) (error, st
 		annotations = append(annotations, deltaAnnotations(deltas, xTotale, yTotale))
 	}
 
-	err, filename := timeseriesChart(&series, xNames, &annotations, title, xAxisName, yAxisName)
+	err, fileName := timeseriesChart(&series, xNames, &annotations, title, filename, xAxisName, yAxisName)
 	if err != nil {
 		return fmt.Errorf("%v", err), ""
 	}
-	return nil, filename
+	return nil, fileName
 }
 
-func totaleGuaritiNazione(data *[]nationData, placeAnnotations bool) (error, string) {
-	title := "Totale Guariti"
+// Returns a plot including national total healed
+func TotaleGuaritiNazione(data *[]NationData, placeAnnotations bool, title, filename string) (error, string) {
 	xAxisName := ""
 	yAxisName := "Guariti"
 
@@ -162,15 +347,15 @@ func totaleGuaritiNazione(data *[]nationData, placeAnnotations bool) (error, str
 	}
 	annotations = append(annotations, deltaAnnotations(deltas, xGuariti, yGuariti))
 
-	err, filename := timeseriesChart(&series, xNames, &annotations, title, xAxisName, yAxisName)
+	err, fileName := timeseriesChart(&series, xNames, &annotations, title, filename, xAxisName, yAxisName)
 	if err != nil {
 		return fmt.Errorf("%v", err), ""
 	}
-	return nil, filename
+	return nil, fileName
 }
 
-func totaleDecedutiNazione(data *[]nationData, placeAnnotations bool) (error, string) {
-	title := "Totale Morti"
+// Returns a plot including national total deaths
+func TotaleDecedutiNazione(data *[]NationData, placeAnnotations bool, title, filename string) (error, string) {
 	xAxisName := ""
 	yAxisName := "Morti"
 
@@ -203,19 +388,19 @@ func totaleDecedutiNazione(data *[]nationData, placeAnnotations bool) (error, st
 		annotations = append(annotations, deltaAnnotations(deltas, xDeceduti, yDeceduti))
 	}
 
-	err, filename := timeseriesChart(&series, xNames, &annotations, title, xAxisName, yAxisName)
+	err, fileName := timeseriesChart(&series, xNames, &annotations, title, filename, xAxisName, yAxisName)
 	if err != nil {
 		return fmt.Errorf("%v", err), ""
 	}
-	return nil, filename
+	return nil, fileName
 }
 
-func attualmentePositiviNazione(data *[]nationData, placeAnnotations bool) (error, string) {
-	title := "Positivi Ancora in Vita"
+// Returns a plot including national current positive cases
+func AttualmentePositiviNazione(data *[]NationData, placeAnnotations bool, title, filename string) (error, string) {
 	xAxisName := ""
 	yAxisName := "Positivi ancora in vita"
 
-	fieldName := "Totale_attualmente_positivi"
+	fieldName := "attualmente_positivi"
 	xPositivi, yPositivi, xNames, err := nationToTimeseries(data, fieldName, 0)
 	if err != nil {
 		return fmt.Errorf("error while creating %v chart: %v", fieldName, err), ""
@@ -244,15 +429,15 @@ func attualmentePositiviNazione(data *[]nationData, placeAnnotations bool) (erro
 		annotations = append(annotations, deltaAnnotations(deltas, xPositivi, yPositivi))
 	}
 
-	err, filename := timeseriesChart(&series, xNames, &annotations, title, xAxisName, yAxisName)
+	err, fileName := timeseriesChart(&series, xNames, &annotations, title, filename, xAxisName, yAxisName)
 	if err != nil {
 		return fmt.Errorf("%v", err), ""
 	}
-	return nil, filename
+	return nil, fileName
 }
 
-func nuoviPositiviNazione(data *[]nationData, placeAnnotations bool) (error, string) {
-	title := "Nuovi Positivi"
+// Returns a plot including national new cases
+func NuoviPositiviNazione(data *[]NationData, placeAnnotations bool, title, filename string) (error, string) {
 	xAxisName := ""
 	yAxisName := "Nuovi positivi"
 
@@ -285,34 +470,30 @@ func nuoviPositiviNazione(data *[]nationData, placeAnnotations bool) (error, str
 		annotations = append(annotations, deltaAnnotations(deltas, xNuoviPositivi, yNuoviPositivi))
 	}
 
-	err, filename := timeseriesChart(&series, xNames, &annotations, title, xAxisName, yAxisName)
+	err, fileName := timeseriesChart(&series, xNames, &annotations, title, filename, xAxisName, yAxisName)
 	if err != nil {
 		return fmt.Errorf("%v", err), ""
 	}
-	return nil, filename
+	return nil, fileName
 }
 
-func vociRegione(data *[]regionData, fieldName []string, regionName string) (error, string) {
-	title := "Dati regione " + regionName
+// Returns a plot with the data of a specified region according to the specified fields
+func VociRegione(data *[]RegionData, fieldName []string, regionIndex int, regionCode int, title, filename string) (error, string) {
 	xAxisName := ""
 	yAxisName := ""
 
-	regionCode, err := findFirstOccurrenceRegion(data, "denominazione_regione", regionName)
-	if err != nil {
-		return fmt.Errorf("wrong region name: %v", err), ""
-	}
-
+	var err error
 	var xValues *[]time.Time
 	var yValues *[]float64
 	var xNames *[]chart.GridLine
 	series := make([]chart.TimeSeries, 0)
 	var color drawing.Color
 	var alpha uint8 = 200
-	var filename string
+	var fileName string
 	for _, v := range fieldName {
-		switch v {
-		case "Ricoverati_con_sintomi":
-			xValues, yValues, xNames, err = regionToTimeseries(data, v, 0, regionCode)
+		switch strings.ToLower(v) {
+		case "ricoverati_con_sintomi":
+			xValues, yValues, xNames, err = regionToTimeseries(data, v, regionIndex, regionCode)
 			color = drawing.Color{38, 224, 175, 255}
 
 			series = append(series, chart.TimeSeries{
@@ -326,8 +507,8 @@ func vociRegione(data *[]regionData, fieldName []string, regionName string) (err
 				YValues: *yValues,
 			})
 			break
-		case "Terapia_intensiva":
-			xValues, yValues, xNames, err = regionToTimeseries(data, v, 0, regionCode)
+		case "terapia_intensiva":
+			xValues, yValues, xNames, err = regionToTimeseries(data, v, regionIndex, regionCode)
 			color = drawing.Color{88, 22, 115, 255}
 
 			series = append(series, chart.TimeSeries{
@@ -341,8 +522,8 @@ func vociRegione(data *[]regionData, fieldName []string, regionName string) (err
 				YValues: *yValues,
 			})
 			break
-		case "Totale_ospedalizzati":
-			xValues, yValues, xNames, err = regionToTimeseries(data, v, 0, regionCode)
+		case "totale_ospedalizzati":
+			xValues, yValues, xNames, err = regionToTimeseries(data, v, regionIndex, regionCode)
 			color = drawing.Color{171, 213, 255, 255}
 
 			series = append(series, chart.TimeSeries{
@@ -356,8 +537,8 @@ func vociRegione(data *[]regionData, fieldName []string, regionName string) (err
 				YValues: *yValues,
 			})
 			break
-		case "Isolamento_domiciliare":
-			xValues, yValues, xNames, err = regionToTimeseries(data, v, 0, regionCode)
+		case "isolamento_domiciliare":
+			xValues, yValues, xNames, err = regionToTimeseries(data, v, regionIndex, regionCode)
 			color = drawing.Color{171, 213, 255, 255}
 
 			series = append(series, chart.TimeSeries{
@@ -371,8 +552,8 @@ func vociRegione(data *[]regionData, fieldName []string, regionName string) (err
 				YValues: *yValues,
 			})
 			break
-		case "Totale_attualmente_positivi":
-			xValues, yValues, xNames, err = regionToTimeseries(data, v, 0, regionCode)
+		case "attualmente_positivi":
+			xValues, yValues, xNames, err = regionToTimeseries(data, v, regionIndex, regionCode)
 			color = drawing.Color{237, 164, 17, 255}
 
 			series = append(series, chart.TimeSeries{
@@ -386,8 +567,23 @@ func vociRegione(data *[]regionData, fieldName []string, regionName string) (err
 				YValues: *yValues,
 			})
 			break
-		case "Nuovi_positivi":
-			xValues, yValues, xNames, err = regionToTimeseries(data, v, 0, regionCode)
+		case "nuovi_positivi":
+			xValues, yValues, xNames, err = regionToTimeseries(data, v, regionIndex, regionCode)
+			color = drawing.Color{18, 4, 217, 255}
+
+			series = append(series, chart.TimeSeries{
+				Name: v,
+				Style: chart.Style{
+					StrokeColor: color,
+					FillColor:   color.WithAlpha(alpha),
+				},
+				YAxis:   0,
+				XValues: *xValues,
+				YValues: *yValues,
+			})
+			break
+		case "dimessi_guariti":
+			xValues, yValues, xNames, err = regionToTimeseries(data, v, regionIndex, regionCode)
 			color = drawing.Color{38, 224, 175, 255}
 
 			series = append(series, chart.TimeSeries{
@@ -401,23 +597,8 @@ func vociRegione(data *[]regionData, fieldName []string, regionName string) (err
 				YValues: *yValues,
 			})
 			break
-		case "Dimessi_guariti":
-			xValues, yValues, xNames, err = regionToTimeseries(data, v, 0, regionCode)
-			color = drawing.Color{38, 224, 175, 255}
-
-			series = append(series, chart.TimeSeries{
-				Name: v,
-				Style: chart.Style{
-					StrokeColor: color,
-					FillColor:   color.WithAlpha(alpha),
-				},
-				YAxis:   0,
-				XValues: *xValues,
-				YValues: *yValues,
-			})
-			break
-		case "Deceduti":
-			xValues, yValues, xNames, err = regionToTimeseries(data, v, 0, regionCode)
+		case "deceduti":
+			xValues, yValues, xNames, err = regionToTimeseries(data, v, regionIndex, regionCode)
 			color = chart.ColorAlternateGray
 
 			series = append(series, chart.TimeSeries{
@@ -431,8 +612,8 @@ func vociRegione(data *[]regionData, fieldName []string, regionName string) (err
 				YValues: *yValues,
 			})
 			break
-		case "Totale_casi":
-			xValues, yValues, xNames, err = regionToTimeseries(data, v, 0, regionCode)
+		case "totale_casi":
+			xValues, yValues, xNames, err = regionToTimeseries(data, v, regionIndex, regionCode)
 			color = drawing.Color{R: 255, A: 255}
 
 			series = append(series, chart.TimeSeries{
@@ -446,8 +627,8 @@ func vociRegione(data *[]regionData, fieldName []string, regionName string) (err
 				YValues: *yValues,
 			})
 			break
-		case "Tamponi":
-			xValues, yValues, xNames, err = regionToTimeseries(data, v, 0, regionCode)
+		case "tamponi":
+			xValues, yValues, xNames, err = regionToTimeseries(data, v, regionIndex, regionCode)
 			color = drawing.Color{175, 232, 169, 255}
 
 			series = append(series, chart.TimeSeries{
@@ -467,26 +648,81 @@ func vociRegione(data *[]regionData, fieldName []string, regionName string) (err
 
 		annotations := make([]chart.AnnotationSeries, 0)
 
-		err, filename = timeseriesChart(&series, xNames, &annotations, title, xAxisName, yAxisName)
+		err, fileName = timeseriesChart(&series, xNames, &annotations, title, filename, xAxisName, yAxisName)
 		if err != nil {
 			return fmt.Errorf("%v", err), ""
 		}
 	}
 
-	return nil, filename
+	return nil, fileName
 }
 
-func totalePositiviProvincia(data *[]provinceData, provinceName string) (error, string) {
-	title := "Totale Contagi " + provinceName
+
+// Returns a plot with the data of a specified province according to the specified fields
+func VociProvince(data *[]ProvinceData, fieldName []string, provinceIndex int, provinceCode int, title, filename string) (error, string) {
+	xAxisName := ""
+	yAxisName := ""
+
+	var err error
+	var xValues *[]time.Time
+	var yValues *[]float64
+	var xNames *[]chart.GridLine
+	series := make([]chart.TimeSeries, 0)
+	var color drawing.Color
+	var alpha uint8 = 200
+	var fileName string
+	for _, v := range fieldName {
+		switch strings.ToLower(v) {
+		case "totale_casi":
+			xValues, yValues, xNames, err = provinceToTimeseries(data, v, provinceIndex, provinceCode)
+			color = drawing.Color{R: 255, A: 255}
+
+			series = append(series, chart.TimeSeries{
+				Name: v,
+				Style: chart.Style{
+					StrokeColor: color,
+					FillColor:   color.WithAlpha(alpha),
+				},
+				YAxis:   0,
+				XValues: *xValues,
+				YValues: *yValues,
+			})
+			break
+		case "nuovi_positivi":
+			xValues, yValues, xNames, err = provinceToTimeseries(data, v, provinceIndex, provinceCode)
+			color = drawing.Color{18, 4, 217, 255}
+
+			series = append(series, chart.TimeSeries{
+				Name: v,
+				Style: chart.Style{
+					StrokeColor: color,
+					FillColor:   color.WithAlpha(alpha),
+				},
+				YAxis:   0,
+				XValues: *xValues,
+				YValues: *yValues,
+			})
+		default:
+			return fmt.Errorf("wrong field name passed"), ""
+		}
+
+		annotations := make([]chart.AnnotationSeries, 0)
+
+		err, fileName = timeseriesChart(&series, xNames, &annotations, title, filename, xAxisName, yAxisName)
+		if err != nil {
+			return fmt.Errorf("%v", err), ""
+		}
+	}
+	return nil, fileName
+}
+
+// Returns total cases for the given province
+func TotalePositiviProvincia(data *[]ProvinceData, provinceIndex int, provinceCode int, title, filename string) (error, string) {
 	xAxisName := ""
 	yAxisName := "Contagiati"
 
-	provinceIndex, err := findFirstOccurrenceProvince(data, "denominazione_provincia", provinceName)
-	if err != nil {
-		return err, ""
-	}
 	fieldName := "Totale_casi"
-	xTotale, yTotale, xNames, err := provinceToTimeseries(data, "Totale_casi", 0, provinceIndex)
+	xTotale, yTotale, xNames, err := provinceToTimeseries(data, "Totale_casi", provinceIndex, provinceCode)
 	if err != nil {
 		return fmt.Errorf("error while creating %v chart: %v", fieldName, err), ""
 	}
@@ -513,19 +749,19 @@ func totalePositiviProvincia(data *[]provinceData, provinceName string) (error, 
 
 	annotations := make([]chart.AnnotationSeries, 0)
 
-	err, filename := timeseriesChart(&series, xNames, &annotations, title, xAxisName, yAxisName)
+	err, fileName := timeseriesChart(&series, xNames, &annotations, title, filename, xAxisName, yAxisName)
 	if err != nil {
 		return fmt.Errorf("%v", err), ""
 	}
-	return nil, filename
+	return nil, fileName
 }
 
-func nuoviPositiviProvincia(data *[]provinceData, provinceName string, placeAnnotations bool) (error, string) {
-	title := "Nuovi Positivi " + provinceName
+// Returns new cases for the given province
+func NuoviPositiviProvincia(data *[]ProvinceData, provinceName string, placeAnnotations bool, title, filename string) (error, string) {
 	xAxisName := ""
 	yAxisName := "Nuovi positivi"
 
-	provinceIndex, err := findFirstOccurrenceProvince(data, "denominazione_provincia", provinceName)
+	provinceIndex, err := FindFirstOccurrenceProvince(data, "denominazione_provincia", provinceName)
 	if err != nil {
 		return err, ""
 	}
@@ -555,9 +791,36 @@ func nuoviPositiviProvincia(data *[]provinceData, provinceName string, placeAnno
 		annotations = append(annotations, deltaAnnotations(deltas, xNuoviPositivi, yNuoviPositivi))
 	}
 
-	err, filename := timeseriesChart(&series, xNames, &annotations, title, xAxisName, yAxisName)
+	err, fileName := timeseriesChart(&series, xNames, &annotations, title, filename, xAxisName, yAxisName)
 	if err != nil {
 		return fmt.Errorf("%v", err), ""
 	}
-	return nil, filename
+	return nil, fileName
+}
+
+// Checks if a given plot already exist by title
+func IsGraphExisting(filename string) bool{
+	_, err := os.Stat(filename)
+	if os.IsNotExist(err) {
+		return false
+	} else {
+		return true
+	}
+}
+
+// Returns a well formatted filename
+func FilenameCreator(plotTitle string) (filename string) {
+	var colorMode string
+
+	lightHour, _ := time.Parse("15:04:05", daySwitch)
+	darkHour, _ := time.Parse("15:04:05", nightSwitch)
+	now := time.Now().Hour()
+	if now >= darkHour.Hour() || now < lightHour.Hour() {
+		colorMode = "dark"
+	} else {
+		colorMode = "light"
+	}
+
+	filename = plotTitle + "-" + colorMode + ".png"
+	return
 }

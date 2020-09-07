@@ -1,4 +1,4 @@
-package datagraphs
+package covidgraphs
 
 import (
 	"bufio"
@@ -10,49 +10,54 @@ import (
 	"math"
 	"net/http"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
+	"time"
 )
 
-const provinceOffset = 128
+const ProvinceOffset = 149
 
-type nationData struct {
-	Data                        string `json:"data"`
-	Stato                       string `json:"stato"`
-	Ricoverati_con_sintomi      int    `json:"ricoverati_con_sintomi"`
-	Terapia_intensiva           int    `json:"terapia_intensiva"`
-	Totale_ospedalizzati        int    `json:"totale_ospedalizzati"`
-	Isolamento_domiciliare      int    `json:"isolamento_domiciliare"`
-	Totale_attualmente_positivi int    `json:"totale_attualmente_positivi"`
-	Nuovi_positivi              int    `json:"nuovi_positivi"`
-	Dimessi_guariti             int    `json:"dimessi_guariti"`
-	Deceduti                    int    `json:"deceduti"`
-	Totale_casi                 int    `json:"totale_casi"`
-	Tamponi                     int    `json:"tamponi"`
-	Note_it                     string `json:"note_it"`
+// National data struct containing fields from the parsed JSON
+type NationData struct {
+	Data                   string `json:"data"`
+	Stato                  string `json:"stato"`
+	Ricoverati_con_sintomi int    `json:"ricoverati_con_sintomi"`
+	Terapia_intensiva      int    `json:"terapia_intensiva"`
+	Totale_ospedalizzati   int    `json:"totale_ospedalizzati"`
+	Isolamento_domiciliare int    `json:"isolamento_domiciliare"`
+	Totale_positivi        int    `json:"totale_positivi"`
+	Nuovi_positivi         int    `json:"nuovi_positivi"`
+	Dimessi_guariti        int    `json:"dimessi_guariti"`
+	Deceduti               int    `json:"deceduti"`
+	Totale_casi            int    `json:"totale_casi"`
+	Tamponi                int    `json:"tamponi"`
+	Note_it                string `json:"note_it"`
 }
 
-type regionData struct {
-	Data                        string  `json:"data"`
-	Stato                       string  `json:"stato"`
-	Codice_regione              int     `json:"codice_regione"`
-	Denominazione_regione       string  `json:"denominazione_regione"`
-	Lat                         float64 `json:"lat"`
-	Long                        float64 `json:"long"`
-	Ricoverati_con_sintomi      int     `json:"ricoverati_con_sintomi"`
-	Terapia_intensiva           int     `json:"terapia_intensiva"`
-	Totale_ospedalizzati        int     `json:"totale_ospedalizzati"`
-	Isolamento_domiciliare      int     `json:"isolamento_domiciliare"`
-	Totale_attualmente_positivi int     `json:"totale_attualmente_positivi"`
-	Nuovi_positivi              int     `json:"nuovi_positivi"`
-	Dimessi_guariti             int     `json:"dimessi_guariti"`
-	Deceduti                    int     `json:"deceduti"`
-	Totale_casi                 int     `json:"totale_casi"`
-	Tamponi                     int     `json:"tamponi"`
-	Note_it                     string  `json:"note_it"`
+// Regional data struct containing fields from the parsed JSON
+type RegionData struct {
+	Data                   string  `json:"data"`
+	Stato                  string  `json:"stato"`
+	Codice_regione         int     `json:"codice_regione"`
+	Denominazione_regione  string  `json:"denominazione_regione"`
+	Lat                    float64 `json:"lat"`
+	Long                   float64 `json:"long"`
+	Ricoverati_con_sintomi int     `json:"ricoverati_con_sintomi"`
+	Terapia_intensiva      int     `json:"terapia_intensiva"`
+	Totale_ospedalizzati   int     `json:"totale_ospedalizzati"`
+	Isolamento_domiciliare int     `json:"isolamento_domiciliare"`
+	Totale_positivi        int     `json:"totale_positivi"`
+	Nuovi_positivi         int     `json:"nuovi_positivi"`
+	Dimessi_guariti        int     `json:"dimessi_guariti"`
+	Deceduti               int     `json:"deceduti"`
+	Totale_casi            int     `json:"totale_casi"`
+	Tamponi                int     `json:"tamponi"`
+	Note_it                string  `json:"note_it"`
 }
 
-type provinceData struct {
+// Provincial data struct containing fields from the parsed JSON
+type ProvinceData struct {
 	Data                    string  `json:"data"`
 	Stato                   string  `json:"stato"`
 	Codice_regione          int     `json:"codice_regione"`
@@ -68,18 +73,25 @@ type provinceData struct {
 	NuoviCasi int
 }
 
-type noteData struct {
+// Notes data struct containing fields from the parsed CSV
+type NoteData struct {
 	Codice           string `json:"codice"`
 	Data             string `json:"Data"`
 	Regione          string `json:"regione"`
 	Provincia        string `json:"provincia"`
 	Tipologia_avviso string `json:"tipologia_avviso"`
 	Avviso           string `json:"avviso"`
-	Note             string `json:"noteData"`
+	Note             string `json:"NoteData"`
 }
 
-func getNation() (*[]nationData, error) {
-	var response []nationData
+var lastUpdateNation time.Time
+var lastUpdateRegions time.Time
+var lastUpdateProvinces time.Time
+var lastUpdateNotes time.Time
+
+// Retrieves and parses nation data from the pcm repo
+func GetNation() (*[]NationData, error) {
+	var response []NationData
 	resp, err := http.Get("https://raw.githubusercontent.com/pcm-dpc/COVID-19/master/dati-json/dpc-covid19-ita-andamento-nazionale.json")
 	if err != nil {
 		return nil, fmt.Errorf("error receiving data: %v", err)
@@ -96,11 +108,13 @@ func getNation() (*[]nationData, error) {
 		}
 	}
 
+	lastUpdateNation = time.Now()
 	return &response, nil
 }
 
-func getRegion() (*[]regionData, error) {
-	var response []regionData
+// Retrieves and parses regions data from the pcm repo
+func GetRegions() (*[]RegionData, error) {
+	var response []RegionData
 	resp, err := http.Get("https://raw.githubusercontent.com/pcm-dpc/COVID-19/master/dati-json/dpc-covid19-ita-regioni.json")
 	if err != nil {
 		return nil, fmt.Errorf("error receiving data: %v", err)
@@ -116,11 +130,14 @@ func getRegion() (*[]regionData, error) {
 			}
 		}
 	}
+
+	lastUpdateRegions = time.Now()
 	return &response, nil
 }
 
-func getProvince() (*[]provinceData, error) {
-	var response []provinceData
+// Retrieves and parses provinces data from the pcm repo
+func GetProvinces() (*[]ProvinceData, error) {
+	var response []ProvinceData
 	resp, err := http.Get("https://raw.githubusercontent.com/pcm-dpc/COVID-19/master/dati-json/dpc-covid19-ita-province.json")
 	if err != nil {
 		return nil, fmt.Errorf("error receiving data: %v", err)
@@ -138,11 +155,13 @@ func getProvince() (*[]provinceData, error) {
 	}
 
 	setNuoviCasiProvince(&response)
+	lastUpdateProvinces = time.Now()
 	return &response, nil
 }
 
-func getNote() (*[]noteData, error) {
-	var notes []noteData
+// Retrieves and parses notes data from the pcm repo
+func GetNotes() (*[]NoteData, error) {
+	var notes []NoteData
 	resp, err := http.Get("https://raw.githubusercontent.com/pcm-dpc/COVID-19/master/note/dpc-covid19-ita-note-it.csv")
 	if err != nil {
 		return nil, fmt.Errorf("error receiving data: %v", err)
@@ -162,7 +181,7 @@ func getNote() (*[]noteData, error) {
 			i++
 			continue
 		}
-		notes = append(notes, noteData{
+		notes = append(notes, NoteData{
 			Codice:           line[0],
 			Data:             line[1],
 			Regione:          line[5],
@@ -173,77 +192,80 @@ func getNote() (*[]noteData, error) {
 		})
 	}
 
+	lastUpdateNotes = time.Now()
 	return &notes, nil
 }
 
-func calculateDelta(first int, second int) (float64, string) {
+// Calculates delta between two integer quantities
+func CalculateDelta(first int, second int) (float64, string) {
 	n := float64(second) - float64(first)
 	delta := math.Abs(n)
 	return delta, fmt.Sprintf("%+.0f", n)
 }
 
-func calculateDeltaPerDay(data *[]nationData, fieldName string, startIndex int) (*[]string, error) {
+// Calculates delta per day of the specified nation data field
+func calculateDeltaPerDay(data *[]NationData, fieldName string, startIndex int) (*[]string, error) {
 	deltas := make([]string, 0)
 	var deltaStr string
 
 	switch fieldName {
 	case "Ricoverati_con_sintomi":
 		for i := startIndex; i < len(*data)-1; i++ {
-			_, deltaStr = calculateDelta((*data)[i].Ricoverati_con_sintomi, (*data)[i+1].Ricoverati_con_sintomi)
+			_, deltaStr = CalculateDelta((*data)[i].Ricoverati_con_sintomi, (*data)[i+1].Ricoverati_con_sintomi)
 			deltas = append(deltas, deltaStr)
 		}
 		break
 	case "Terapia_intensiva":
 		for i := startIndex; i < len(*data)-1; i++ {
-			_, deltaStr = calculateDelta((*data)[i].Terapia_intensiva, (*data)[i+1].Terapia_intensiva)
+			_, deltaStr = CalculateDelta((*data)[i].Terapia_intensiva, (*data)[i+1].Terapia_intensiva)
 			deltas = append(deltas, deltaStr)
 		}
 		break
 	case "Totale_ospedalizzati":
 		for i := startIndex; i < len(*data)-1; i++ {
-			_, deltaStr = calculateDelta((*data)[i].Totale_ospedalizzati, (*data)[i+1].Totale_ospedalizzati)
+			_, deltaStr = CalculateDelta((*data)[i].Totale_ospedalizzati, (*data)[i+1].Totale_ospedalizzati)
 			deltas = append(deltas, deltaStr)
 		}
 		break
 	case "Isolamento_domiciliare":
 		for i := startIndex; i < len(*data)-1; i++ {
-			_, deltaStr = calculateDelta((*data)[i].Isolamento_domiciliare, (*data)[i+1].Isolamento_domiciliare)
+			_, deltaStr = CalculateDelta((*data)[i].Isolamento_domiciliare, (*data)[i+1].Isolamento_domiciliare)
 			deltas = append(deltas, deltaStr)
 		}
 		break
-	case "Totale_attualmente_positivi":
+	case "attualmente_positivi":
 		for i := startIndex; i < len(*data)-1; i++ {
-			_, deltaStr = calculateDelta((*data)[i].Totale_attualmente_positivi, (*data)[i+1].Totale_attualmente_positivi)
+			_, deltaStr = CalculateDelta((*data)[i].Totale_positivi, (*data)[i+1].Totale_positivi)
 			deltas = append(deltas, deltaStr)
 		}
 		break
 	case "Nuovi_positivi":
 		for i := startIndex; i < len(*data)-1; i++ {
-			_, deltaStr = calculateDelta((*data)[i].Nuovi_positivi, (*data)[i+1].Nuovi_positivi)
+			_, deltaStr = CalculateDelta((*data)[i].Nuovi_positivi, (*data)[i+1].Nuovi_positivi)
 			deltas = append(deltas, deltaStr)
 		}
 		break
 	case "Dimessi_guariti":
 		for i := startIndex; i < len(*data)-1; i++ {
-			_, deltaStr = calculateDelta((*data)[i].Dimessi_guariti, (*data)[i+1].Dimessi_guariti)
+			_, deltaStr = CalculateDelta((*data)[i].Dimessi_guariti, (*data)[i+1].Dimessi_guariti)
 			deltas = append(deltas, deltaStr)
 		}
 		break
 	case "Deceduti":
 		for i := startIndex; i < len(*data)-1; i++ {
-			_, deltaStr = calculateDelta((*data)[i].Deceduti, (*data)[i+1].Deceduti)
+			_, deltaStr = CalculateDelta((*data)[i].Deceduti, (*data)[i+1].Deceduti)
 			deltas = append(deltas, deltaStr)
 		}
 		break
 	case "Totale_casi":
 		for i := startIndex; i < len(*data)-1; i++ {
-			_, deltaStr = calculateDelta((*data)[i].Totale_casi, (*data)[i+1].Totale_casi)
+			_, deltaStr = CalculateDelta((*data)[i].Totale_casi, (*data)[i+1].Totale_casi)
 			deltas = append(deltas, deltaStr)
 		}
 		break
 	case "Tamponi":
 		for i := startIndex; i < len(*data)-1; i++ {
-			_, deltaStr = calculateDelta((*data)[i].Tamponi, (*data)[i+1].Tamponi)
+			_, deltaStr = CalculateDelta((*data)[i].Tamponi, (*data)[i+1].Tamponi)
 			deltas = append(deltas, deltaStr)
 		}
 		break
@@ -254,27 +276,30 @@ func calculateDeltaPerDay(data *[]nationData, fieldName string, startIndex int) 
 	return &deltas, nil
 }
 
-func setNuoviCasiProvince(data *[]provinceData) {
-	for i := 0; i < len(*data)-provinceOffset; i++ {
-		if i < provinceOffset {
+// Sets the artificial NuoviCasi field for provinces
+func setNuoviCasiProvince(data *[]ProvinceData) {
+	for i := 0; i < len(*data)-ProvinceOffset; i++ {
+		if i < ProvinceOffset {
 			(*data)[i].NuoviCasi = (*data)[i].Totale_casi
 		} else {
-			delta, _ := calculateDelta((*data)[i].Totale_casi, (*data)[i+provinceOffset].Totale_casi)
-			(*data)[i+provinceOffset].NuoviCasi = int(delta)
+			delta, _ := CalculateDelta((*data)[i].Totale_casi, (*data)[i+ProvinceOffset].Totale_casi)
+			(*data)[i+ProvinceOffset].NuoviCasi = int(delta)
 		}
 	}
 }
 
-func intToDeltasArray(data *[]provinceData, startProvinceIndex int) *[]string {
+// Creates an array of delta for creating annotations
+func intToDeltasArray(data *[]ProvinceData, startProvinceIndex int) *[]string {
 	deltas := make([]string, 0)
-	for i := startProvinceIndex; i < len(*data); i += provinceOffset {
+	for i := startProvinceIndex; i < len(*data); i += ProvinceOffset {
 		deltas = append(deltas, strconv.Itoa((*data)[i].NuoviCasi))
 	}
 
 	return &deltas
 }
 
-func findFirstOccurrenceNation(data *[]nationData, fieldName string, toFind interface{}) (int, error) {
+// Finds the first occurence in the nation data array for the specified field
+func FindFirstOccurrenceNation(data *[]NationData, fieldName string, toFind interface{}) (int, error) {
 	var find interface{}
 	switch toFind.(type) {
 	case string:
@@ -309,8 +334,8 @@ func findFirstOccurrenceNation(data *[]nationData, fieldName string, toFind inte
 				return i, nil
 			}
 			break
-		case "Totale_attualmente_positivi":
-			if v.Totale_attualmente_positivi == find {
+		case "attualmente_positivi":
+			if v.Totale_positivi == find {
 				return i, nil
 			}
 			break
@@ -346,14 +371,16 @@ func findFirstOccurrenceNation(data *[]nationData, fieldName string, toFind inte
 	return -1, fmt.Errorf("element not found")
 }
 
-func findFirstOccurrenceRegion(data *[]regionData, fieldName string, toFind interface{}) (int, error) {
+// Finds the first occurence in the regions data array for the specified field
+func FindFirstOccurrenceRegion(data *[]RegionData, fieldName string, toFind interface{}) (int, error) {
 	var find interface{}
 	switch toFind.(type) {
 	case string:
-		find = toFind.(string)
+		find = strings.ToLower(toFind.(string))
 		break
 	case int:
 		find = toFind.(int)
+		break
 	default:
 		return -1, fmt.Errorf("wrong tofind type")
 		break
@@ -367,7 +394,7 @@ func findFirstOccurrenceRegion(data *[]regionData, fieldName string, toFind inte
 			}
 			break
 		case "denominazione_regione":
-			if v.Denominazione_regione == find {
+			if strings.Replace(strings.ToLower(v.Denominazione_regione), "-", " ", -1) == strings.Replace(strings.ToLower(find.(string)), "-", " ", -1) {
 				return i, nil
 			}
 			break
@@ -391,8 +418,8 @@ func findFirstOccurrenceRegion(data *[]regionData, fieldName string, toFind inte
 				return i, nil
 			}
 			break
-		case "totale_attualmente_positivi":
-			if v.Totale_attualmente_positivi == find {
+		case "attualmente_positivi":
+			if v.Totale_positivi == find {
 				return i, nil
 			}
 			break
@@ -428,11 +455,12 @@ func findFirstOccurrenceRegion(data *[]regionData, fieldName string, toFind inte
 	return -1, fmt.Errorf("element not found")
 }
 
-func findFirstOccurrenceProvince(data *[]provinceData, fieldName string, toFind interface{}) (int, error) {
+// Finds the first occurence in the provinces data array for the specified field
+func FindFirstOccurrenceProvince(data *[]ProvinceData, fieldName string, toFind interface{}) (int, error) {
 	var find interface{}
 	switch toFind.(type) {
 	case string:
-		find = toFind.(string)
+		find = strings.ToLower(toFind.(string))
 		break
 	case int:
 		find = toFind.(int)
@@ -441,7 +469,7 @@ func findFirstOccurrenceProvince(data *[]provinceData, fieldName string, toFind 
 		return -1, fmt.Errorf("wrong tofind type")
 		break
 	}
-
+	
 	for i, v := range *data {
 		switch strings.ToLower(fieldName) {
 		case "codice_regione":
@@ -449,7 +477,7 @@ func findFirstOccurrenceProvince(data *[]provinceData, fieldName string, toFind 
 				return i, nil
 			}
 		case "denominazione_provincia":
-			if v.Denominazione_provincia == find {
+			if strings.Replace(strings.ToLower(v.Denominazione_provincia), "-", " ", -1) == strings.Replace(strings.ToLower(find.(string)), "-", " ", -1) {
 				return i, nil
 			}
 		case "sigla_provincia":
@@ -468,7 +496,8 @@ func findFirstOccurrenceProvince(data *[]provinceData, fieldName string, toFind 
 	return -1, fmt.Errorf("element not found")
 }
 
-func findFirstOccurrenceNote(data *[]noteData, fieldName string, toFind interface{}) (int, error) {
+// Finds the first occurence in the notes data array for the specified field
+func FindFirstOccurrenceNote(data *[]NoteData, fieldName string, toFind interface{}) (int, error) {
 	var find interface{}
 	switch toFind.(type) {
 	case string:
@@ -520,11 +549,214 @@ func findFirstOccurrenceNote(data *[]noteData, fieldName string, toFind interfac
 	return -1, fmt.Errorf("element not found")
 }
 
-func deleteFile(filename string) error {
+// Deletes the specified file
+func DeleteFile(filename string) error {
 	err := os.Remove(filename)
 	if err != nil {
 		return fmt.Errorf("error deleting file: %v", err)
 	}
 
 	return nil
+}
+
+// Returns regions names list
+func GetRegionsNamesList(data *[]RegionData) []string {
+	regionsNames := make([]string, 0)
+	for _, v := range *data {
+		regionsNames = append(regionsNames, v.Denominazione_regione)
+	}
+
+	return regionsNames
+}
+
+// Returns northern regions names list
+func GetNordRegionsNamesList() []string {
+	nordRegions := []string{"Piemonte", "Valle d'Aosta", "Liguria", "Lombardia", "P.A. Trento", "P.A. Bolzano", "Veneto", "Friuli Venezia Giulia", "Emilia Romagna"}
+	return nordRegions
+}
+
+// Returns central regions names list
+func GetCentroRegionsNamesList() []string {
+	centroRegions := []string{"Toscana", "Umbria", "Marche", "Lazio"}
+	return centroRegions
+}
+
+// Returns southern regions names list
+func GetSudRegionsNamesList() []string {
+	sudRegions := []string{"Abruzzo", "Molise", "Campania", "Puglia", "Basilicata", "Calabria", "Sicilia", "Sardegna"}
+	return sudRegions
+}
+
+// Returns top regions according to field totale_contagi
+func GetTopTenRegionsTotaleContagi(data *[]RegionData) *[]RegionData {
+	latestData:=make([]RegionData, 21)
+	copy(latestData, (*data)[len(*data)-21 : len(*data)])
+
+	sort.Slice(latestData, func(i, j int) bool {
+		return latestData[i].Totale_casi > latestData[j].Totale_casi
+	})
+
+	return &latestData
+}
+
+// Returns top provinces according to field totale_casi
+func GetTopTenProvincesTotaleContagi(data *[]ProvinceData) *[]ProvinceData {
+	latestData:=make([]ProvinceData, ProvinceOffset)
+	copy(latestData, (*data)[len(*data)-ProvinceOffset : len(*data)])
+
+	sort.Slice(latestData, func(i, j int) bool {
+		return latestData[i].Totale_casi > latestData[j].Totale_casi
+	})
+
+	return &latestData
+}
+
+// Finds the last occurence in the regions data array for the specified field
+func FindLastOccurrenceRegion(data *[]RegionData, fieldName string, toFind interface{}) (int, error) {
+	latestData := (*data)[len(*data)-21 : len(*data)]
+
+	var find interface{}
+	switch toFind.(type) {
+	case string:
+		find = strings.ToLower(toFind.(string))
+		break
+	case int:
+		find = toFind.(int)
+	default:
+		return -1, fmt.Errorf("wrong tofind type")
+		break
+	}
+
+	for i, v := range latestData {
+		switch strings.ToLower(fieldName) {
+		case "codice_regione":
+			if v.Codice_regione == find {
+				return i + len(*data) - 21, nil
+			}
+			break
+		case "denominazione_regione":
+			if strings.Replace(strings.ToLower(v.Denominazione_regione), "-", " ", -1) == strings.Replace(strings.ToLower(find.(string)), "-", " ", -1) {
+				return i + len(*data) - 21, nil
+			}
+			break
+		case "ricoverati_con_sintomi":
+			if v.Ricoverati_con_sintomi == find {
+				return i + len(*data) - 21, nil
+			}
+			break
+		case "terapia_intensiva":
+			if v.Terapia_intensiva == find {
+				return i + len(*data) - 21, nil
+			}
+			break
+		case "totale_ospedalizzati":
+			if v.Totale_ospedalizzati == find {
+				return i + len(*data) - 21, nil
+			}
+			break
+		case "isolamento_domiciliare":
+			if v.Isolamento_domiciliare == find {
+				return i + len(*data) - 21, nil
+			}
+			break
+		case "attualmente_positivi":
+			if v.Totale_positivi == find {
+				return i + len(*data) - 21, nil
+			}
+			break
+		case "nuovi_positivi":
+			if v.Nuovi_positivi == find {
+				return i + len(*data) - 21, nil
+			}
+			break
+		case "dimessi_guariti":
+			if v.Dimessi_guariti == find {
+				return i + len(*data) - 21, nil
+			}
+			break
+		case "deceduti":
+			if v.Deceduti == find {
+				return i + len(*data) - 21, nil
+			}
+			break
+		case "totale_casi":
+			if v.Totale_casi == find {
+				return i + len(*data) - 21, nil
+			}
+			break
+		case "tamponi":
+			if v.Tamponi == find {
+				return i + len(*data) - 21, nil
+			}
+			break
+		default:
+			return -1, fmt.Errorf("wrong field name passed")
+		}
+	}
+	return -1, fmt.Errorf("element not found")
+}
+
+// Finds the last occurence in the provinces data array for the specified field
+func FindLastOccurrenceProvince(data *[]ProvinceData, fieldName string, toFind interface{}) (int, error) {
+	latestData := (*data)[len(*data)-ProvinceOffset : len(*data)]
+
+	var find interface{}
+	switch toFind.(type) {
+	case string:
+		find = strings.ToLower(toFind.(string))
+		break
+	case int:
+		find = toFind.(int)
+		break
+	default:
+		return -1, fmt.Errorf("wrong tofind type")
+		break
+	}
+
+	for i, v := range latestData {
+		switch strings.ToLower(fieldName) {
+		case "codice_regione":
+			if v.Codice_regione == find {
+				return i + len(*data) - ProvinceOffset, nil
+			}
+		case "denominazione_provincia":
+			if strings.Replace(strings.ToLower(v.Denominazione_provincia), "-", " ", -1) == strings.Replace(strings.ToLower(find.(string)), "-", " ", -1) {
+				return i + len(*data) - ProvinceOffset, nil
+			}
+		case "sigla_provincia":
+			if v.Sigla_provincia == find {
+				return i + len(*data) - ProvinceOffset, nil
+			}
+		case "totale_casi":
+			if v.Totale_casi == find {
+				return i + len(*data) - ProvinceOffset, nil
+			}
+		default:
+			break
+		}
+	}
+
+	return -1, fmt.Errorf("element not found")
+}
+
+// Returns the last provinces data according to the given region name
+func GetLastProvincesByRegionName(data *[]ProvinceData, regionName string) *[]ProvinceData {
+	latestData := (*data)[len(*data)-ProvinceOffset : len(*data)]
+	provinces := make([]ProvinceData, 0)
+
+	for _, v := range latestData {
+		if strings.ToLower(v.Denominazione_regione) == strings.ToLower(regionName) && strings.ToLower(v.Denominazione_provincia) != "in fase di definizione/aggiornamento" && strings.ToLower(v.Denominazione_provincia) != "fuori regione / provincia autonoma"{
+			provinces = append(provinces, v)
+		}
+	}
+
+	return &provinces
+}
+
+// Deletes plots folder and recreates it
+func DeleteAllPlots(folder string){
+	path, _:=os.Getwd()
+	path=path+folder
+	os.RemoveAll(path)
+	os.Mkdir(path, 0755)
 }
