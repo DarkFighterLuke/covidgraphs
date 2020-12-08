@@ -657,9 +657,8 @@ func VociRegione(data *[]RegionData, fieldName []string, regionIndex int, region
 	return nil, fileName
 }
 
-
 // Returns a plot with the data of a specified province according to the specified fields
-func VociProvince(data *[]ProvinceData, fieldName []string, provinceIndex int, provinceCode int, title, filename string) (error, string) {
+func VociProvince(data *[]ProvinceData, fieldName []string, provinceIndexes *[]int, title, filename string) (error, string) {
 	xAxisName := ""
 	yAxisName := ""
 
@@ -674,7 +673,7 @@ func VociProvince(data *[]ProvinceData, fieldName []string, provinceIndex int, p
 	for _, v := range fieldName {
 		switch strings.ToLower(v) {
 		case "totale_casi":
-			xValues, yValues, xNames, err = provinceToTimeseries(data, v, provinceIndex, provinceCode)
+			xValues, yValues, xNames, err = provinceToTimeseries(data, v, provinceIndexes)
 			color = drawing.Color{R: 255, A: 255}
 
 			series = append(series, chart.TimeSeries{
@@ -689,7 +688,7 @@ func VociProvince(data *[]ProvinceData, fieldName []string, provinceIndex int, p
 			})
 			break
 		case "nuovi_positivi":
-			xValues, yValues, xNames, err = provinceToTimeseries(data, v, provinceIndex, provinceCode)
+			xValues, yValues, xNames, err = provinceToTimeseries(data, v, provinceIndexes)
 			color = drawing.Color{18, 4, 217, 255}
 
 			series = append(series, chart.TimeSeries{
@@ -717,12 +716,12 @@ func VociProvince(data *[]ProvinceData, fieldName []string, provinceIndex int, p
 }
 
 // Returns total cases for the given province
-func TotalePositiviProvincia(data *[]ProvinceData, provinceIndex int, provinceCode int, title, filename string) (error, string) {
+func TotalePositiviProvincia(data *[]ProvinceData, provinceIndexes *[]int, title, filename string) (error, string) {
 	xAxisName := ""
 	yAxisName := "Contagiati"
 
 	fieldName := "Totale_casi"
-	xTotale, yTotale, xNames, err := provinceToTimeseries(data, "Totale_casi", provinceIndex, provinceCode)
+	xTotale, yTotale, xNames, err := provinceToTimeseries(data, "Totale_casi", provinceIndexes)
 	if err != nil {
 		return fmt.Errorf("error while creating %v chart: %v", fieldName, err), ""
 	}
@@ -757,16 +756,12 @@ func TotalePositiviProvincia(data *[]ProvinceData, provinceIndex int, provinceCo
 }
 
 // Returns new cases for the given province
-func NuoviPositiviProvincia(data *[]ProvinceData, provinceName string, placeAnnotations bool, title, filename string) (error, string) {
+func NuoviPositiviProvincia(data *[]ProvinceData, provinceIndexes *[]int, placeAnnotations bool, title, filename string) (error, string) {
 	xAxisName := ""
 	yAxisName := "Nuovi positivi"
 
-	provinceIndex, err := FindFirstOccurrenceProvince(data, "denominazione_provincia", provinceName)
-	if err != nil {
-		return err, ""
-	}
-	fieldName := "NuoviCasi"
-	xNuoviPositivi, yNuoviPositivi, xNames, err := provinceToTimeseries(data, fieldName, 0, provinceIndex)
+	fieldName := "nuovi_positivi"
+	xNuoviPositivi, yNuoviPositivi, xNames, err := provinceToTimeseries(data, fieldName, provinceIndexes)
 	if err != nil {
 		return fmt.Errorf("error while creating %v chart: %v", fieldName, err), ""
 	}
@@ -787,7 +782,7 @@ func NuoviPositiviProvincia(data *[]ProvinceData, provinceName string, placeAnno
 
 	annotations := make([]chart.AnnotationSeries, 0)
 	if placeAnnotations {
-		deltas := intToDeltasArray(data, provinceIndex)
+		deltas := intToDeltasArray(data, provinceIndexes)
 		annotations = append(annotations, deltaAnnotations(deltas, xNuoviPositivi, yNuoviPositivi))
 	}
 

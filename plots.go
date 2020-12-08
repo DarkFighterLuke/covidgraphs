@@ -255,22 +255,12 @@ func regionToTimeseries(data *[]RegionData, fieldName string, index int, startRe
 }
 
 // Creates series of points according to the provincial data
-func provinceToTimeseries(data *[]ProvinceData, fieldName string, index int, startProvinceCodeIndex int) (*[]time.Time, *[]float64, *[]chart.GridLine, error) {
-	offset := index % ProvinceOffset
-	var realIndex int
-	if offset == startProvinceCodeIndex {
-		realIndex = index
-	} else if offset > startProvinceCodeIndex {
-		realIndex = index + ProvinceOffset - (offset - startProvinceCodeIndex)
-	} else {
-		realIndex = index + (startProvinceCodeIndex - offset)
-	}
-
+func provinceToTimeseries(data *[]ProvinceData, fieldName string, provinceIndexes *[]int) (*[]time.Time, *[]float64, *[]chart.GridLine, error) {
 	date := make([]time.Time, 0)
 	values := make([]float64, 0)
 	dateAxis := make([]chart.GridLine, 0)
-	for i := realIndex; i < len(*data); i += ProvinceOffset {
-		dateRead, err := time.Parse("2006-01-02T15:04:05", (*data)[i].Data)
+	for _,v:=range *provinceIndexes {
+		dateRead, err := time.Parse("2006-01-02T15:04:05", (*data)[v].Data)
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("error converting date string to date: %v", err)
 		}
@@ -281,10 +271,10 @@ func provinceToTimeseries(data *[]ProvinceData, fieldName string, index int, sta
 
 		switch strings.ToLower(fieldName) {
 		case "totale_casi":
-			values = append(values, float64((*data)[i].Totale_casi))
+			values = append(values, float64((*data)[v].Totale_casi))
 			break
 		case "nuovi_positivi":
-			values = append(values, float64((*data)[i].NuoviCasi))
+			values = append(values, float64((*data)[v].NuoviCasi))
 			break
 		default:
 			return nil, nil, nil, fmt.Errorf("wrong field name passed")

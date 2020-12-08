@@ -16,8 +16,6 @@ import (
 	"time"
 )
 
-const ProvinceOffset = 149
-
 // National data struct containing fields from the parsed JSON
 type NationData struct {
 	Data                   string `json:"data"`
@@ -88,6 +86,7 @@ var lastUpdateNation time.Time
 var lastUpdateRegions time.Time
 var lastUpdateProvinces time.Time
 var lastUpdateNotes time.Time
+
 
 // Retrieves and parses nation data from the pcm repo
 func GetNation() (*[]NationData, error) {
@@ -276,26 +275,42 @@ func calculateDeltaPerDay(data *[]NationData, fieldName string, startIndex int) 
 	return &deltas, nil
 }
 
-// Sets the artificial NuoviCasi field for provinces
-func setNuoviCasiProvince(data *[]ProvinceData) {
-	for i := 0; i < len(*data)-ProvinceOffset; i++ {
-		if i < ProvinceOffset {
-			(*data)[i].NuoviCasi = (*data)[i].Totale_casi
-		} else {
-			delta, _ := CalculateDelta((*data)[i].Totale_casi, (*data)[i+ProvinceOffset].Totale_casi)
-			(*data)[i+ProvinceOffset].NuoviCasi = int(delta)
-		}
-	}
-}
-
 // Creates an array of delta for creating annotations
-func intToDeltasArray(data *[]ProvinceData, startProvinceIndex int) *[]string {
+func intToDeltasArray(data *[]ProvinceData, provinceIndexes *[]int) *[]string {
 	deltas := make([]string, 0)
-	for i := startProvinceIndex; i < len(*data); i += ProvinceOffset {
+	for i := range *provinceIndexes {
 		deltas = append(deltas, strconv.Itoa((*data)[i].NuoviCasi))
 	}
 
 	return &deltas
+}
+
+// Sets the artificial NuoviCasi field for provinces
+func setNuoviCasiProvince(data *[]ProvinceData) {
+	//set -1 to all indicating as not already filled
+	for i, _:=range (*data){
+		(*data)[i].NuoviCasi=-1
+	}
+
+	for i:=len(*data)-1; i>0; i-- {
+		if (*data)[i].NuoviCasi==-1 &&
+			(*data)[i].Denominazione_provincia!="Fuori Regione / Provincia Autonoma" &&
+			(*data)[i].Denominazione_provincia!="In fase di definizione/aggiornamento"{
+			var lastOccurrenceIndex=i
+			for j:=i; j>0; j-- {
+				if (*data)[j].Denominazione_provincia==(*data)[lastOccurrenceIndex].Denominazione_provincia{
+					delta, _:=CalculateDelta((*data)[j].Totale_casi, (*data)[lastOccurrenceIndex].Totale_casi)
+					(*data)[lastOccurrenceIndex].NuoviCasi=int(delta)
+					lastOccurrenceIndex=j
+				}
+			}
+			firstDayIndex, err:=FindFirstOccurrenceProvince(data, "denominazione_provincia", (*data)[i].Denominazione_provincia)
+			if err!=nil{
+				fmt.Println("Error setting NuoviCasi for provinces: ", err)
+			}
+			(*data)[firstDayIndex].NuoviCasi=(*data)[firstDayIndex].Totale_casi
+		}
+	}
 }
 
 // Finds the first occurence in the nation data array for the specified field
@@ -469,7 +484,7 @@ func FindFirstOccurrenceProvince(data *[]ProvinceData, fieldName string, toFind 
 		return -1, fmt.Errorf("wrong tofind type")
 		break
 	}
-	
+
 	for i, v := range *data {
 		switch strings.ToLower(fieldName) {
 		case "codice_regione":
@@ -549,16 +564,6 @@ func FindFirstOccurrenceNote(data *[]NoteData, fieldName string, toFind interfac
 	return -1, fmt.Errorf("element not found")
 }
 
-// Deletes the specified file
-func DeleteFile(filename string) error {
-	err := os.Remove(filename)
-	if err != nil {
-		return fmt.Errorf("error deleting file: %v", err)
-	}
-
-	return nil
-}
-
 // Returns regions names list
 func GetRegionsNamesList(data *[]RegionData) []string {
 	regionsNames := make([]string, 0)
@@ -589,8 +594,8 @@ func GetSudRegionsNamesList() []string {
 
 // Returns top regions according to field totale_contagi
 func GetTopTenRegionsTotaleContagi(data *[]RegionData) *[]RegionData {
-	latestData:=make([]RegionData, 21)
-	copy(latestData, (*data)[len(*data)-21 : len(*data)])
+	latestData := make([]RegionData, 21)
+	copy(latestData, (*data)[len(*data)-21:len(*data)])
 
 	sort.Slice(latestData, func(i, j int) bool {
 		return latestData[i].Totale_casi > latestData[j].Totale_casi
@@ -601,8 +606,14 @@ func GetTopTenRegionsTotaleContagi(data *[]RegionData) *[]RegionData {
 
 // Returns top provinces according to field totale_casi
 func GetTopTenProvincesTotaleContagi(data *[]ProvinceData) *[]ProvinceData {
-	latestData:=make([]ProvinceData, ProvinceOffset)
-	copy(latestData, (*data)[len(*data)-ProvinceOffset : len(*data)])
+	latestData:=make([]ProvinceData, 0)
+	for i:=len(*data)-2; i>0; i-- {
+		if (*data)[i].Denominazione_provincia!=(*data)[len(*data)-1].Denominazione_provincia{
+			latestData=append(latestData, (*data)[i])
+		}else{
+			break
+		}
+	}
 
 	sort.Slice(latestData, func(i, j int) bool {
 		return latestData[i].Totale_casi > latestData[j].Totale_casi
@@ -698,8 +709,6 @@ func FindLastOccurrenceRegion(data *[]RegionData, fieldName string, toFind inter
 
 // Finds the last occurence in the provinces data array for the specified field
 func FindLastOccurrenceProvince(data *[]ProvinceData, fieldName string, toFind interface{}) (int, error) {
-	latestData := (*data)[len(*data)-ProvinceOffset : len(*data)]
-
 	var find interface{}
 	switch toFind.(type) {
 	case string:
@@ -709,27 +718,27 @@ func FindLastOccurrenceProvince(data *[]ProvinceData, fieldName string, toFind i
 		find = toFind.(int)
 		break
 	default:
-		return -1, fmt.Errorf("wrong tofind type")
+		return -1, fmt.Errorf("wrong toFind type")
 		break
 	}
 
-	for i, v := range latestData {
+	for i := len(*data); i > 0; i-- {
 		switch strings.ToLower(fieldName) {
 		case "codice_regione":
-			if v.Codice_regione == find {
-				return i + len(*data) - ProvinceOffset, nil
+			if (*data)[i].Codice_regione == find {
+				return i, nil
 			}
 		case "denominazione_provincia":
-			if strings.Replace(strings.ToLower(v.Denominazione_provincia), "-", " ", -1) == strings.Replace(strings.ToLower(find.(string)), "-", " ", -1) {
-				return i + len(*data) - ProvinceOffset, nil
+			if strings.Replace(strings.ToLower((*data)[i].Denominazione_provincia), "-", " ", -1) == strings.Replace(strings.ToLower(find.(string)), "-", " ", -1) {
+				return i, nil
 			}
 		case "sigla_provincia":
-			if v.Sigla_provincia == find {
-				return i + len(*data) - ProvinceOffset, nil
+			if (*data)[i].Sigla_provincia == find {
+				return i, nil
 			}
 		case "totale_casi":
-			if v.Totale_casi == find {
-				return i + len(*data) - ProvinceOffset, nil
+			if (*data)[i].Totale_casi == find {
+				return i, nil
 			}
 		default:
 			break
@@ -741,22 +750,45 @@ func FindLastOccurrenceProvince(data *[]ProvinceData, fieldName string, toFind i
 
 // Returns the last provinces data according to the given region name
 func GetLastProvincesByRegionName(data *[]ProvinceData, regionName string) *[]ProvinceData {
-	latestData := (*data)[len(*data)-ProvinceOffset : len(*data)]
 	provinces := make([]ProvinceData, 0)
 
-	for _, v := range latestData {
-		if strings.ToLower(v.Denominazione_regione) == strings.ToLower(regionName) && strings.ToLower(v.Denominazione_provincia) != "in fase di definizione/aggiornamento" && strings.ToLower(v.Denominazione_provincia) != "fuori regione / provincia autonoma"{
-			provinces = append(provinces, v)
+	for i := len(*data); i > 0; i-- {
+		if strings.ToLower((*data)[i].Denominazione_regione) == strings.ToLower(regionName) &&
+			strings.ToLower((*data)[i].Denominazione_provincia) != "in fase di definizione/aggiornamento" &&
+			strings.ToLower((*data)[i].Denominazione_provincia) != "fuori regione / provincia autonoma" {
+			provinces = append(provinces, (*data)[i])
 		}
 	}
 
 	return &provinces
 }
 
+// Returns a slice with all the given province data
+func GetProvinceIndexesByName(data *[]ProvinceData, provinceName string) *[]int {
+	provinceIndexes := make([]int, 0)
+	for i, pData := range *data {
+		if strings.ToLower(pData.Denominazione_provincia) == strings.ToLower(provinceName) {
+			provinceIndexes = append(provinceIndexes, i)
+		}
+	}
+
+	return &provinceIndexes
+}
+
+// Deletes the specified file
+func DeleteFile(filename string) error {
+	err := os.Remove(filename)
+	if err != nil {
+		return fmt.Errorf("error deleting file: %v", err)
+	}
+
+	return nil
+}
+
 // Deletes plots folder and recreates it
-func DeleteAllPlots(folder string){
-	path, _:=os.Getwd()
-	path=path+folder
+func DeleteAllPlots(folder string) {
+	path, _ := os.Getwd()
+	path = path + folder
 	os.RemoveAll(path)
 	os.Mkdir(path, 0755)
 }
