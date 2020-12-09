@@ -153,6 +153,7 @@ func GetProvinces() (*[]ProvinceData, error) {
 		}
 	}
 
+	//eraseTrashProvinces(&response)
 	setNuoviCasiProvince(&response)
 	lastUpdateProvinces = time.Now()
 	return &response, nil
@@ -288,27 +289,27 @@ func intToDeltasArray(data *[]ProvinceData, provinceIndexes *[]int) *[]string {
 // Sets the artificial NuoviCasi field for provinces
 func setNuoviCasiProvince(data *[]ProvinceData) {
 	//set -1 to all indicating as not already filled
-	for i, _:=range (*data){
-		(*data)[i].NuoviCasi=-1
+	for i, _ := range (*data) {
+		(*data)[i].NuoviCasi = -1
 	}
 
-	for i:=len(*data)-1; i>0; i-- {
-		if (*data)[i].NuoviCasi==-1 &&
-			(*data)[i].Denominazione_provincia!="Fuori Regione / Provincia Autonoma" &&
-			(*data)[i].Denominazione_provincia!="In fase di definizione/aggiornamento"{
-			var lastOccurrenceIndex=i
-			for j:=i; j>0; j-- {
-				if (*data)[j].Denominazione_provincia==(*data)[lastOccurrenceIndex].Denominazione_provincia{
-					delta, _:=CalculateDelta((*data)[j].Totale_casi, (*data)[lastOccurrenceIndex].Totale_casi)
-					(*data)[lastOccurrenceIndex].NuoviCasi=int(delta)
-					lastOccurrenceIndex=j
+	for i := len(*data) - 1; i > 0; i-- {
+		if (*data)[i].NuoviCasi == -1 &&
+			(*data)[i].Denominazione_provincia != "Fuori Regione / Provincia Autonoma" &&
+			(*data)[i].Denominazione_provincia != "In fase di definizione/aggiornamento" {
+			var lastOccurrenceIndex = i
+			for j := i; j > 0; j-- {
+				if (*data)[j].Denominazione_provincia == (*data)[lastOccurrenceIndex].Denominazione_provincia {
+					delta, _ := CalculateDelta((*data)[j].Totale_casi, (*data)[lastOccurrenceIndex].Totale_casi)
+					(*data)[lastOccurrenceIndex].NuoviCasi = int(delta)
+					lastOccurrenceIndex = j
 				}
 			}
-			firstDayIndex, err:=FindFirstOccurrenceProvince(data, "denominazione_provincia", (*data)[i].Denominazione_provincia)
-			if err!=nil{
+			firstDayIndex, err := FindFirstOccurrenceProvince(data, "denominazione_provincia", (*data)[i].Denominazione_provincia)
+			if err != nil {
 				fmt.Println("Error setting NuoviCasi for provinces: ", err)
 			}
-			(*data)[firstDayIndex].NuoviCasi=(*data)[firstDayIndex].Totale_casi
+			(*data)[firstDayIndex].NuoviCasi = (*data)[firstDayIndex].Totale_casi
 		}
 	}
 }
@@ -607,11 +608,13 @@ func GetTopTenRegionsTotaleContagi(data *[]RegionData) *[]RegionData {
 // Returns top provinces according to field totale_casi
 func GetTopTenProvincesTotaleContagi(data *[]ProvinceData) *[]ProvinceData {
 	latestData:=make([]ProvinceData, 0)
-	for i:=len(*data)-2; i>0; i-- {
-		if (*data)[i].Denominazione_provincia!=(*data)[len(*data)-1].Denominazione_provincia{
-			latestData=append(latestData, (*data)[i])
-		}else{
+	latestDate, _:=time.Parse("2006-01-02T15:04:05", (*data)[len(*data)-1].Data)
+	for i:=len(*data)-1; i>0; i--{
+		date, _:=time.Parse("2006-01-02T15:04:05", (*data)[i].Data)
+		if latestDate.Day()-date.Day()>0{
 			break
+		}else{
+			latestData=append(latestData, (*data)[i])
 		}
 	}
 
@@ -722,7 +725,7 @@ func FindLastOccurrenceProvince(data *[]ProvinceData, fieldName string, toFind i
 		break
 	}
 
-	for i := len(*data); i > 0; i-- {
+	for i := len(*data)-1; i > 0; i-- {
 		switch strings.ToLower(fieldName) {
 		case "codice_regione":
 			if (*data)[i].Codice_regione == find {
@@ -750,9 +753,19 @@ func FindLastOccurrenceProvince(data *[]ProvinceData, fieldName string, toFind i
 
 // Returns the last provinces data according to the given region name
 func GetLastProvincesByRegionName(data *[]ProvinceData, regionName string) *[]ProvinceData {
-	provinces := make([]ProvinceData, 0)
+	provinces:=make([]ProvinceData, 0)
 
-	for i := len(*data); i > 0; i-- {
+	latestDate, _:=time.Parse("2006-01-02T15:04:05", (*data)[len(*data)-1].Data)
+	var firstLatestIndex int
+	for i:=len(*data)-1; i>0; i--{
+		date, _:=time.Parse("2006-01-02T15:04:05", (*data)[i].Data)
+		if latestDate.Day()-date.Day()>0{
+			firstLatestIndex=i+1
+			break
+		}
+	}
+
+	for i := firstLatestIndex; i<len(*data); i++ {
 		if strings.ToLower((*data)[i].Denominazione_regione) == strings.ToLower(regionName) &&
 			strings.ToLower((*data)[i].Denominazione_provincia) != "in fase di definizione/aggiornamento" &&
 			strings.ToLower((*data)[i].Denominazione_provincia) != "fuori regione / provincia autonoma" {
