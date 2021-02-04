@@ -801,7 +801,7 @@ func DeleteFile(filename string) error {
 // Deletes plots folder and recreates it
 func DeleteAllPlots(folder string) {
 	path, _ := os.Getwd()
-	path = path + folder
+	path = path + "/" + folder
 	os.RemoveAll(path)
 	os.Mkdir(path, 0755)
 }
