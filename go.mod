@@ -1,4 +1,4 @@
-module covidgraphs
+module github.com/DarkFighterLuke/covidgraphs
 
 go 1.16
 
